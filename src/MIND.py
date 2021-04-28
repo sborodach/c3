@@ -1,4 +1,6 @@
+import numpy as np
 import pandas as pd
+from nltk.corpus import stopwords
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import figure
 plt.style.use('ggplot')
@@ -8,6 +10,11 @@ import requests
 from bs4 import BeautifulSoup
 import re
 import collections
+from prettytable import PrettyTable
+
+from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
+from sklearn.decomposition import NMF, LatentDirichletAllocation as LDA
+from sklearn.metrics.pairwise import cosine_similarity
 
 class MINDSmallData():
     '''Clean and prepare MIND news and behaviors datasets for analaysis.
@@ -74,7 +81,6 @@ class MINDSmallData():
 
         
     def clean_user_data(self):
-        # clean user behaviors datatframe
         
         self.user_data.columns = ['Impression ID', 'User ID', 'Time', 'History', 'Impressions'] # set column names
         self.user_data.drop(self.user_data[self.user_data['History'].isna()].index, inplace=True)
@@ -106,7 +112,7 @@ class MINDSmallData():
         
         
     def plot_topic_distrubtions(self, news_data=None):
-        # Creates two plots: distributions of topics and subtopics. 
+        # Create plots of distributions of topics and subtopics. 
         # If clean_data() has been called, this plotting function will 
         # use the object attrbitues self.news_data. If not, a dataframe
         # must be passed in.
@@ -170,7 +176,7 @@ class MINDSmallData():
         
         
         
-        
+# Additional cleaing of news_data        
 #         one_time_subtopics = list(self.news_data['subtopic'].value_counts()[(self.news_data['subtopic'].value_counts() == 1).values].index) 
 #         self.news_data.drop(self.news_data[self.news_data['subtopic'].apply(lambda x: x in one_time_subtopics)].index, inplace=True)
 
@@ -187,3 +193,416 @@ class MINDSmallData():
 #                         'NEWSPOLITICS': 'POLITICS', 'BASEBALL_MLB': 'MLB', 'NEWSUS': 'US NEWS', 'BASKETBALL_NBA': 'NBA', 'NEWSCRIME': 'CRIME',
 #                         'NEWSWORLD': 'WORLD NEWS', 'FOOTBALL_NCAA': 'NCAA FOOTBALL', 'LIFESTYLEROYALS': 'ROYALTY LIFESTYLE'}
 #         self.news_data['subtopic'].replace(subtopic_dict, inplace=True)
+
+
+
+
+class CreateFeatureMatrix():
+    '''Takes in language data and creates a feature matrix stored as an attribute of the name feature_matrix.
+    Option to utilize the MIND dataset directly or other strings in list or Series form.
+    
+    Paramaters
+    ----------
+    features : str, 'LDA', 'NMF', or 'TFIDF'
+    n_components : int, must be at least 2
+    ngram_range : tuple of two integers, first int must be equal to or less than the second
+    
+    See Also
+    --------
+    
+    Examples
+    --------
+    >>> data = ['This is a tool for building a content recommender',
+                'Content recommenders can be challenging to evaluate',
+                'Sports readers typically enjoy sports recommendations'
+                'MIND is a userful dataset for studying recommenders',
+                'medium.com is difficult to scrape from']
+    >>> create_matrix = CreateFeatureMatrix(data, MIND=False, n_components=3)
+    >>> create_matrix.featurize()
+    >>> create_matrix.feature_matrix
+        array([[0.70385031, 0.14807349, 0.1480762 ],
+               [0.18583332, 0.64621002, 0.16795666],
+               [0.33333333, 0.33333333, 0.33333333],
+               [0.18583223, 0.16795668, 0.64621109],
+               [0.33333333, 0.33333333, 0.33333333]])
+    '''
+    
+    def __init__(self, data, MIND=True, ngram_range=(1,1), features='LDA', n_components=15):
+        
+        self.MIND = MIND
+        if self.MIND:
+            self.data = data
+            self.corpus = data['content']
+            self._add_stopwords()
+        else:
+            self.corpus = data
+        
+        self.vectorized = None
+        self.ngram_range = ngram_range
+        self.features = features
+        self.stopwords = set(stopwords.words('english'))
+        
+        self.model = None
+        self.feature_matrix = None
+        
+        self.n_components = n_components
+        self.reconstruction_errors = {}
+        self.feature_names = None
+        
+
+    def _add_stopwords(self):
+        
+        self.additional_stopwords = ['said', 'trump', 'just', 'like', '2019']
+        for word in self.additional_stopwords:
+            self.stopwords.add(word)
+            
+    def featurize(self):
+        
+        if self.features == 'LDA':
+            self._LDA()
+            
+        elif self.features == 'NMF':
+            self._NMF()
+            
+        else:
+            self._vectorize()
+    
+    
+    def _vectorize(self):
+    # 
+        if self.features == 'LDA':
+            tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
+                                stop_words='english', ngram_range = self.ngram_range) # max_features=n_features
+            self.vectorized = tf_vectorizer.fit_transform(self.corpus)
+            self.feature_names = tf_vectorizer.get_feature_names()
+            
+        else:
+            tfidf_vectorizer = TfidfVectorizer(max_df=0.95, min_df=20,
+                                               stop_words='english', ngram_range=self.ngram_range)
+            self.vectorized = tfidf_vectorizer.fit_transform(self.corpus)
+            self.feature_names = tfidf_vectorizer.get_feature_names()
+            if self.features == 'TFIDF':
+                self.feature_matrix = self.vectorized
+                
+                
+    def _LDA(self):
+
+        self._vectorize()
+        
+        self.model = LDA(n_components = self.n_components).fit(self.vectorized)
+        self.feature_matrix = self.model.transform(self.vectorized)
+
+    
+    def _NMF(self):
+        
+        self._vectorize()
+        
+        self.model = NMF(n_components=self.n_components, max_iter=400, random_state=1,
+              alpha=.1, l1_ratio=.5).fit(self.vectorized)
+        
+        self.feature_matrix = self.model.transform(self.vectorized)
+
+
+    # research optimal number of components
+    
+    def _reconstruction_error(self): # get reconstruction error per n_components
+        
+        for n_components in range(5,30,5):
+            
+            if self.features == 'LDA':
+                model = LDA(n_components=n_components).fit(self.vectorized)
+                self.reconstruction_errors[n_components] = model.reconstruction_err_
+                
+            else:
+                model = NMF(n_components=n_components, max_iter=400, random_state=1,
+                  alpha=.1, l1_ratio=.5).fit(self.vectorized)
+                self.reconstruction_errors[n_components] = model.reconstruction_err_
+
+            
+    def plot_reconstruction_error(self): #plots elbow plot to find optimal n_components
+
+        self._reconstruction_error()
+        
+        plt.plot(self.reconstruction_errors.keys(), self.reconstruction_errors.values(), color='orange')
+        plt.title('Reconstruction Error per Num Components')
+        plt.xlabel('Num Components')
+        plt.ylabel('Error')
+        plt.xticks(ticks=[5,10,15,20,25], labels=[5,10,15,50,25]);
+        
+        
+        
+    def plot_top_words(self, n_top_words, title): # from sklearn documentation
+
+        fig, axes = plt.subplots(3, 5, figsize=(30, 25), sharex=True)
+        axes = axes.flatten()
+        for topic_idx, topic in enumerate(self.model.components_):
+            top_features_ind = topic.argsort()[:-n_top_words - 1:-1]
+            top_features = [self.feature_names[i] for i in top_features_ind]
+            weights = topic[top_features_ind]
+
+            ax = axes[topic_idx]
+            if self.features == 'LDA':
+                ax.barh(top_features, weights, height=0.7)
+            else:
+                ax.barh(top_features, weights, height=0.7, color='b')
+            ax.set_title(f'Topic {topic_idx +1}',
+                         fontdict={'fontsize': 30})
+            ax.invert_yaxis()
+            ax.tick_params(axis='both', which='major', labelsize=20)
+            for i in 'top right left'.split():
+                ax.spines[i].set_visible(False)
+            fig.suptitle(title, fontsize=40)
+
+        plt.subplots_adjust(top=0.90, bottom=0.05, wspace=0.90, hspace=0.3)
+        plt.show();
+        plt.savefig('nmf_15.png')
+        
+        
+        
+
+
+class ContentRecommender():
+    
+    '''Generate recommendations for news articles based on user input.
+    Built on mind.py and feature_matrix.py. Can pass
+    
+    Paramaters
+    -------------
+    corpus : list of document
+    data : DataFrame
+    feature_matrix : TFIDF, LDA, or NMF matrix (num_documents x num_features)
+    similarity_metric : str, default='cosine'
+        'jaccard', 'pearson'
+        
+    
+    Example
+    -------
+    
+    Notes
+    -----
+    
+    See Also
+    --------
+    
+    
+    '''
+    
+    def __init__(self, news_data, user_data, feature_matrix, similarity_metric='cosine'):
+        
+        self.news_data = news_data
+        self.corpus = news_data['content']
+        self.user_data = user_data
+        self.feature_matrix = feature_matrix
+
+        self.similarity_dict = {'cosine': cosine_similarity} # , 'jaccard': jaccard, 'pearson': pearson
+        self.similarity_metric = similarity_metric
+        
+        self.feature_names = None
+
+        
+    def _calculate_covariance(self, doc_ind=None, user_vector=None):
+        
+        return pd.DataFrame(self.similarity_dict[self.similarity_metric](self.feature_matrix, user_vector), index = self.news_data.index)
+                   
+    
+    def recommend(self, User_ID, by=None):
+        
+        articles = ''.join(list(self.user_data[self.user_data['User ID'] == User_ID]['Read Articles'].values))
+
+        articles_ind = self.news_data[self.news_data['code'].apply(lambda x: x in articles)].index
+        
+        user_vector = self.feature_matrix.loc[articles_ind].mean(axis=0).to_numpy().reshape(1,-1)
+
+        of_interest_ind = self._calculate_covariance(self.feature_matrix.to_numpy(), user_vector).sort_values(by=0)[-20:].index[::-1]
+
+        return of_interest_ind
+        
+        R = self.news_data['subtopic'][articles_ind].values
+        
+        S = self.news_data['title'][articles_ind].values
+        
+        T = self.news_data['subtopic'][of_interest_ind].values
+
+        U = self.news_data['title'][of_interest_ind].values
+
+#         return pd.DataFrame({'code': self.news_data['code'][of_interest_ind].values, 'topic': self.news_data['topic'][of_interest_ind].values, 'title': self.news_data['title'][of_interest_ind].values}), self.news_data[by][of_interest_ind].value_counts().index, self.news_data[by][of_interest_ind].value_counts().values
+    
+
+    def evaulate_user(self, num_users, by='topic'):
+        user_data = self.user_data[self.user_data['Read Articles'].apply(lambda x: len(x.split(' ')) > 100)]
+        
+        for i in range(num_users): # range(user_data.shape[0])
+            user_read_articles = self.news_data[self.news_data['code'].apply(lambda x: x in user_data.iloc[i,1].split(' '))]
+            d = {}
+            for j, v in zip(user_read_articles[by].value_counts().index, user_read_articles[by].value_counts().values):
+                d[j] = v
+                
+            w, x, y = self.recommend(user_data.iloc[i,0], by)
+        
+            d2 = {}
+            for i, v in zip(x,y):
+                d2[i] = v
+                
+            
+            tot = sum(d.values())
+            for k, v in d.items():
+                d[k] = v/tot
+            
+#             good = False
+#             for v in d.values():
+#                 if v > .4:
+#                     good == True
+            
+#             if good:
+            d_topics = {}
+            for k, v in d.items():
+                if v > .4:
+                    d_topics['H'] = [k]
+
+                if v > .25 and v <= .4:
+                    if 'M' not in d_topics:
+                        d_topics['M'] = []
+                    d_topics['M'].append(k)
+
+                if v > .1 and v <= .25:
+                    if 'L' not in d_topics:
+                        d_topics['L'] = []
+                    d_topics['L'].append(k)
+                    
+                if v <= .1:
+                    if 'VL' not in d_topics:
+                        d_topics['VL'] = []
+                    d_topics['VL'].append(k)
+
+#             if 'H' in d_topics:
+            t = PrettyTable([by, 'Interest', '%', '#']) # create table of topic, interst level, and number recommended
+            z = 0
+            for k, v in d_topics.items():
+                for i in v:
+                    if i in d2:
+                        t.add_row([i.title(), k, round(list(d.values())[z], 2) * 100, d2[i]])
+                    else:
+                        t.add_row([i.title(), k, round(list(d.values())[z], 2) * 100, 0])
+                    z+=1
+            print(t)
+            print('\n')
+
+            print(w)
+
+            
+            
+            
+            
+            
+            
+            
+            
+            
+            
+
+
+
+
+
+
+
+
+    # other pieces for recommend: WOO!
+    
+    # print('Here are the articles you\'ve read:')
+        
+#         read_articles = []
+#         for r, s in zip(R, S):
+#             read_articles.append(r + ': ' + s)
+#         print(read_articles)
+        
+#         print(f'\n Here are some articles we recommend:')
+
+#         for t, u in zip(T, U):
+#             print('\t' + t + ': ' + u)
+            
+          
+            
+    def evaluate(self, x=range(10)):
+
+        user_topics = []
+        recommended_topics = []
+        for i in x:
+            articles = self.user_data['Read Articles'][i]
+            
+            articles_ind = self.news_data[self.news_data['code'].apply(lambda x: x in articles)].index
+
+            W_df = pd.read_csv('data/W.csv').drop('Unnamed: 0',axis=1).set_index(self.news_data.index)
+
+            user_vector = W_df.loc[articles_ind].mean(axis=0).to_numpy().reshape(1,-1)
+
+            of_interest_ind = self._calculate_user_covariance(W_df.to_numpy(), user_vector).sort_values(by=0)[-6:].index[::-1]
+
+            self.news_data['topic'][of_interest_ind].values
+            
+            user_topics.append(set(self.news_data['topic'][articles_ind].values))
+            
+            recommended_topics.append(self.news_data['topic'][of_interest_ind].values)
+
+        for u, r in zip(user_topics, recommended_topics):
+            print(', '.join(list(u)) + ': ' + ', '.join(r))
+            
+            
+    def evaluate_NMF(self, x=range(1)):
+
+        
+        user_data_2 = self.user_data[self.user_data['Read Articles'].apply(lambda x: len(x.split(' ')) > 450)]
+        
+        if self.NMF:
+            df = pd.read_csv('data/W.csv').drop('Unnamed: 0',axis=1).set_index(self.news_data.index)
+
+        elif self.LDA:
+            df = pd.read_csv('data/LDA_matrix.csv').drop('Unnamed: 0',axis=1).set_index(self.news_data.index)
+            
+        else:
+            pass
+        
+        for i in x: # user_data_2.shape[0]
+            
+#             user_codes = None
+#             test_codes = None
+#             recommended_codes = None
+            read_articles = []
+#             train_articles = None
+#             test_articles = None
+#             train_articles_ind = None
+#             test_articles_ind = None
+            
+            for code in user_data_2['Read Articles'].iloc[i].split(' '):
+                if code in self.news_data['code'].values:
+                    read_articles.append(code)
+                    
+            train_articles = read_articles[:-5]
+            test_articles = read_articles[-5:]
+
+            train_articles_ind = self.news_data[self.news_data['code'].apply(lambda x: x in train_articles)].index
+            test_articles_ind = self.news_data[self.news_data['code'].apply(lambda x: x in test_articles)].index
+
+            
+
+            user_vector = df.loc[train_articles_ind].mean(axis=0).to_numpy().reshape(1,-1)
+
+            covariance_df = self._calculate_user_covariance(df.to_numpy(), user_vector)
+            
+            print(covariance_df.iloc[test_articles_ind])
+            print(user_vector)
+            
+#             print(covariance_df.sort_values(by=0)[-10:])
+            
+#             of_interest_ind = self._calculate_user_covariance(df.to_numpy(), user_vector).sort_values(by=0)[-50:].index[::-1]
+
+#             user_codes = self.news_data['code'][train_articles_ind].values
+
+#             test_codes = self.news_data['code'][test_articles_ind].values
+
+#             recommended_codes = self.news_data['code'][of_interest_ind].values
+
+#             print(any(item in recommended_codes for item in test_codes))
+#             print(test_codes, recommended_codes)
+#             print(len(list(user_codes)))
+            
