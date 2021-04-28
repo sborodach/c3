@@ -11,15 +11,49 @@ from sklearn.decomposition import NMF, LatentDirichletAllocation as LDA
 
 
 class CreateFeatureMatrix():
-
-    def __init__(self, data, ngram_range=(1,1), features='LDA', n_components=15):
+    '''Takes in language data and creates a feature matrix stored as an attribute of the name feature_matrix.
+    Option to utilize the MIND dataset directly or other strings in list or Series form.
+    
+    Paramaters
+    ----------
+    features : str, 'LDA', 'NMF', or 'TFIDF'
+    n_components : int, must be at least 2
+    ngram_range : tuple of two integers, first int must be equal to or less than the second
+    
+    See Also
+    --------
+    
+    Examples
+    --------
+    >>> data = ['This is a tool for building a content recommender',
+                'Content recommenders can be challenging to evaluate',
+                'Sports readers typically enjoy sports recommendations'
+                'MIND is a userful dataset for studying recommender',
+                'medium.com is difficult to scrape from']
+    >>> create_matrix = CreateFeatureMatrix(data, MIND=False, n_components=3)
+    >>> create_matrix.featurize()
+    >>> create_matrix.feature_matrix
+        array([[0.70385031, 0.14807349, 0.1480762 ],
+               [0.18583332, 0.64621002, 0.16795666],
+               [0.33333333, 0.33333333, 0.33333333],
+               [0.18583223, 0.16795668, 0.64621109],
+               [0.33333333, 0.33333333, 0.33333333]])
+    '''
+    
+    def __init__(self, data, MIND=True, ngram_range=(1,1), features='LDA', n_components=15):
         
-        self.data = data
-        self.corpus = data['content']
+        self.MIND = MIND
+        if self.MIND:
+            self.data = data
+            self.corpus = data['content']
+            self._add_stopwords()
+        else:
+            self.corpus = data
         
         self.vectorized = None
         self.ngram_range = ngram_range
         self.features = features
+        self.stopwords = set(stopwords.words('english'))
         
         self.model = None
         self.feature_matrix = None
@@ -27,8 +61,14 @@ class CreateFeatureMatrix():
         self.n_components = n_components
         self.reconstruction_errors = {}
         self.feature_names = None
-
         
+
+    def _add_stopwords(self):
+        
+        self.additional_stopwords = ['said', 'trump', 'just', 'like', '2019']
+        for word in self.additional_stopwords:
+            self.stopwords.add(word)
+            
     def featurize(self):
         
         if self.features == 'LDA':
@@ -40,8 +80,9 @@ class CreateFeatureMatrix():
         else:
             self._vectorize()
     
+    
     def _vectorize(self):
-
+    # 
         if self.features == 'LDA':
             tf_vectorizer = CountVectorizer(max_df=0.95, min_df=2,
                                 stop_words='english', ngram_range = self.ngram_range) # max_features=n_features
@@ -55,6 +96,14 @@ class CreateFeatureMatrix():
             self.feature_names = tfidf_vectorizer.get_feature_names()
             if self.features == 'TFIDF':
                 self.feature_matrix = self.vectorized
+                
+                
+    def _LDA(self):
+
+        self._vectorize()
+        
+        self.model = LDA(n_components = self.n_components).fit(self.vectorized)
+        self.feature_matrix = self.model.transform(self.vectorized)
 
     
     def _NMF(self):
@@ -64,14 +113,6 @@ class CreateFeatureMatrix():
         self.model = NMF(n_components=self.n_components, max_iter=400, random_state=1,
               alpha=.1, l1_ratio=.5).fit(self.vectorized)
         
-        self.feature_matrix = self.model.transform(self.vectorized)
-    
-    
-    def _LDA(self):
-
-        self._vectorize()        
-        
-        self.model = LDA(n_components = self.n_components).fit(self.vectorized)
         self.feature_matrix = self.model.transform(self.vectorized)
 
 
@@ -113,7 +154,7 @@ class CreateFeatureMatrix():
             weights = topic[top_features_ind]
 
             ax = axes[topic_idx]
-            if self.LDA:
+            if self.features == 'LDA':
                 ax.barh(top_features, weights, height=0.7)
             else:
                 ax.barh(top_features, weights, height=0.7, color='b')

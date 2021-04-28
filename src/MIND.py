@@ -16,7 +16,7 @@ class MINDSmallData():
         self.user_data = pd.read_csv('MINDsmall_train/behaviors.tsv', sep='\t')
         self.clean = False
 
-    def clean_article_data(self):
+    def clean_news_data(self):
         '''
         Clean news data frame
         '''
@@ -31,9 +31,9 @@ class MINDSmallData():
         # drop 'content' na values
         self.news_data.drop(self.news_data[self.news_data['abstract'].isna()].index, inplace=True)
         
-        # drops rows with subtopics that only appear once
-        one_time_subtopics = list(self.news_data['subtopic'].value_counts()[(self.news_data['subtopic'].value_counts() == 1).values].index) 
-        self.news_data.drop(self.news_data[self.news_data['subtopic'].apply(lambda x: x in one_time_subtopics)].index, inplace=True)
+        # optional: drops rows with subtopics that only appear once
+        # one_time_subtopics = list(self.news_data['subtopic'].value_counts()[(self.news_data['subtopic'].value_counts() == 1).values].index) 
+        # self.news_data.drop(self.news_data[self.news_data['subtopic'].apply(lambda x: x in one_time_subtopics)].index, inplace=True)
 
         # clean up topic names
         self.news_data['topic'].replace('foodanddrink','FOOD & DRINK', inplace=True)
@@ -42,14 +42,15 @@ class MINDSmallData():
         self.news_data['topic'] = self.news_data['topic'].apply(lambda x: x.upper())
         self.news_data['topic'].replace('MIDDLEEAST', 'NEWS', inplace=True)
         
-        self.news_data.drop(self.news_data[self.news_data['topic'] == 'KIDS'].index, inplace=True)
-        self.news_data.drop(self.news_data[self.news_data['topic'] == 'VIDEO'].index, inplace=True)
+        # optional: drop rows with topics that only appear 1-2 times
+        # self.news_data.drop(self.news_data[self.news_data['topic'] == 'KIDS'].index, inplace=True)
+        # self.news_data.drop(self.news_data[self.news_data['topic'] == 'VIDEO'].index, inplace=True)
 
+        # clean up subtopic names
         self.news_data['subtopic'] = self.news_data['subtopic'].apply(lambda x: x.upper())
         subtopic_dict = {'WEATHERTOPSTORIES': 'WEATHER', 'FOOTBALL_NFL': 'NFL', 'NEWSSCIENCEANDTECHNOLOGY': 'SCIENCE & TECHNOLOGY',
                         'NEWSPOLITICS': 'POLITICS', 'BASEBALL_MLB': 'MLB', 'NEWSUS': 'US NEWS', 'BASKETBALL_NBA': 'NBA', 'NEWSCRIME': 'CRIME',
                         'NEWSWORLD': 'WORLD NEWS', 'FOOTBALL_NCAA': 'NCAA FOOTBALL', 'LIFESTYLEROYALS': 'ROYALTY LIFESTYLE'}
-        
         self.news_data['subtopic'].replace(subtopic_dict, inplace=True)
         self.news_data['subtopic'] = self.news_data['subtopic'].apply(lambda x: x.title())
         
@@ -133,7 +134,7 @@ class MINDSmallData():
         self.user_data.drop(['History', 'Time', 'Impressions'], axis=1, inplace=True)
         
         
-    def plot_topic_distrubtions(self, article_data=None):
+    def plot_topic_distrubtions(self, news_data=None):
 
         '''
         Creates two plots: distributions of topics and subtopics. If clean_data() has been called,
@@ -143,8 +144,8 @@ class MINDSmallData():
 
         if not self.clean:
             try:
-                topics = article_data['topic'].value_counts().index[:10]
-                distributions = article_data['topic'].value_counts()[:10]
+                topics = news_data['topic'].value_counts().index[:10]
+                distributions = news_data['topic'].value_counts()[:10]
 
                 fig, ax = plt.subplots(figsize=(18,10))
                 bar_values = ['index', 'values']
@@ -154,8 +155,8 @@ class MINDSmallData():
                 plt.yscale('log');
                 plt.savefig('topic_distribution.png')
 
-                topics = article_data['subtopic'].value_counts().index[:10]
-                distributions = article_data['subtopic'].value_counts()[:10]
+                topics = news_data['subtopic'].value_counts().index[:10]
+                distributions = news_data['subtopic'].value_counts()[:10]
 
                 fig, ax = plt.subplots(figsize=(18,10))
                 bar_values = ['index', 'values']
@@ -172,7 +173,7 @@ class MINDSmallData():
         try:
             topics = self.news_data['topic'].value_counts().index[:10]
         except KeyError:
-            return 'ERROR: A dataframe must be passed if clean_article_data() is not called'
+            return 'ERROR: A dataframe must be passed if clean_news_data() is not called'
         
         distributions = self.news_data['topic'].value_counts()[:10]
 

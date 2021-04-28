@@ -56,7 +56,7 @@ class ContentRecommender():
         return pd.DataFrame(self.similarity_dict[self.similarity_metric](self.feature_matrix, user_vector), index = self.news_data.index)
                    
     
-    def recommend(self, User_ID, by):
+    def recommend(self, User_ID, by=None):
         
         articles = ''.join(list(self.user_data[self.user_data['User ID'] == User_ID]['Read Articles'].values))
 
@@ -66,6 +66,8 @@ class ContentRecommender():
 
         of_interest_ind = self._calculate_covariance(self.feature_matrix.to_numpy(), user_vector).sort_values(by=0)[-20:].index[::-1]
 
+        return of_interest_ind
+        
         R = self.news_data['subtopic'][articles_ind].values
         
         S = self.news_data['title'][articles_ind].values
@@ -74,7 +76,7 @@ class ContentRecommender():
 
         U = self.news_data['title'][of_interest_ind].values
 
-        return self.news_data[by][of_interest_ind].value_counts().index, self.news_data[by][of_interest_ind].value_counts().values
+#         return pd.DataFrame({'code': self.news_data['code'][of_interest_ind].values, 'topic': self.news_data['topic'][of_interest_ind].values, 'title': self.news_data['title'][of_interest_ind].values}), self.news_data[by][of_interest_ind].value_counts().index, self.news_data[by][of_interest_ind].value_counts().values
     
 
     def evaulate_user(self, num_users, by='topic'):
@@ -86,7 +88,7 @@ class ContentRecommender():
             for j, v in zip(user_read_articles[by].value_counts().index, user_read_articles[by].value_counts().values):
                 d[j] = v
                 
-            x, y = self.recommend(user_data.iloc[i,0], by)
+            w, x, y = self.recommend(user_data.iloc[i,0], by)
         
             d2 = {}
             for i, v in zip(x,y):
@@ -117,20 +119,37 @@ class ContentRecommender():
                     if 'L' not in d_topics:
                         d_topics['L'] = []
                     d_topics['L'].append(k)
+                    
+                if v <= .1:
+                    if 'VL' not in d_topics:
+                        d_topics['VL'] = []
+                    d_topics['VL'].append(k)
 
-            if 'H' in d_topics:
-                t = PrettyTable([by, 'Interest', '#']) # create table of topic, interst level, and number recommended
-                for k, v in d_topics.items():
-                    for i in v:
-                        if i in d2:
-                            t.add_row([i.title(), k.title(), d2[i]])
-                        else:
-                            t.add_row([i.title(), k.title(), 0])
-                print(t)
-                print('\n')
+#             if 'H' in d_topics:
+            t = PrettyTable([by, 'Interest', '%', '#']) # create table of topic, interst level, and number recommended
+            z = 0
+            for k, v in d_topics.items():
+                for i in v:
+                    if i in d2:
+                        t.add_row([i.title(), k, round(list(d.values())[z], 2) * 100, d2[i]])
+                    else:
+                        t.add_row([i.title(), k, round(list(d.values())[z], 2) * 100, 0])
+                    z+=1
+            print(t)
+            print('\n')
+
+            print(w)
+
             
             
-
+            
+            
+            
+            
+            
+            
+            
+            
 
 
 
