@@ -16,15 +16,26 @@ from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 from sklearn.decomposition import NMF, LatentDirichletAllocation as LDA
 from sklearn.metrics.pairwise import cosine_similarity
 
-class MINDSmallData():
+
+class SmallData():
     '''Clean and prepare MIND news and behaviors datasets for analaysis.
     Various methods associated with the class.
-    User IDs and History values are not unique in behaviors.tsv, only Timestamp, Impression IDs and Impressions are.
+    User IDs and History values are not unique in behaviors.tsv, only 
+    Timestamp, Impression IDs and Impressions are.
     
     Parameters
     ----------
     news_filepath : str
     behaviors_filepath: str
+    
+    Methods
+    -------
+    clean_news_data : cleans and prepares news.tsv
+    get_content : requests HTML for each article in links column of news.tsv;
+        saving html to mongoDB requires running docker container
+    add_content : 
+    clean_user_data : cleans and prepares behaviors.tsv
+    plot_topic_distributions : plot topic and subtopic distributions
     
     See More
     --------
@@ -33,20 +44,27 @@ class MINDSmallData():
     '''
     
     def __init__(self, news_filepath, behaviors_filepath):
-        self.news_data = pd.read_csv(news_filepath, sep='\t').T.reset_index().T.reset_index(drop=True)
-        self.user_data = pd.read_csv(behaviors_filepath, sep='\t').T.reset_index().T.reset_index(drop=True)
+        self.news_data = (pd.read_csv(news_filepath, sep='\t').T.reset_index()
+                          .T.reset_index(drop=True))
+        self.user_data = (pd.read_csv(behaviors_filepath, sep='\t').T.
+                          reset_index().T.reset_index(drop=True))
         self.clean = False
 
+        
     def clean_news_data(self):
         # clean news data frame
         
-        self.news_data.columns = ['code', 'topic', 'subtopic', 'title', 'abstract', 'link', 'tags1', 'tags2']
-        self.news_data.drop(self.news_data[self.news_data['link'].isna()].index, inplace=True)
-        self.news_data['topic'] = self.news_data['topic'].apply(lambda x: x.upper())
-        self.news_data['subtopic'] = self.news_data['subtopic'].apply(lambda x: x.title())
-        
+        self.news_data.columns = ['code', 'topic', 'subtopic', 'title', 
+                                  'abstract', 'link', 'tags1', 'tags2']
+        self.news_data.drop(self.news_data[self.news_data['link'].isna()].
+                            index, inplace=True)
+        self.news_data['topic'] = self.news_data['topic'].apply(lambda x: 
+                                                                x.upper())
+        self.news_data['subtopic'] = self.news_data['subtopic'].apply(lambda x: 
+                                                                      x.title())
         self.clean = True
 
+        
     def get_content(self): 
         # Request html for each article, parse, save to mongo database
         
@@ -75,15 +93,20 @@ class MINDSmallData():
         db = client['news-html']
         content = pd.Series(list(db['html'].find({}, {'html':1, '_id':0})))
         self.news_data['content'] = list(db['html'].find({}, {'html':1, '_id':0}))
-        self.news_data.drop(self.news_data[self.news_data['content'] == {}].index, inplace=True)
-        self.news_data['content'] = self.news_data['content'].apply(lambda x: str(list(x.values())[0]))
-        self.news_data.drop(self.news_data[self.news_data['content'].isna()].index, inplace=True)
+        self.news_data.drop(self.news_data[self.news_data['content'] == {}]
+                            .index, inplace=True)
+        self.news_data['content'] = self.news_data['content'].apply(lambda x: 
+                                                                    str(list(x.values())[0]))
+        self.news_data.drop(self.news_data[self.news_data['content'].isna()]
+                            .index, inplace=True)
 
         
     def clean_user_data(self):
         
-        self.user_data.columns = ['Impression ID', 'User ID', 'Time', 'History', 'Impressions'] # set column names
-        self.user_data.drop(self.user_data[self.user_data['History'].isna()].index, inplace=True)
+        self.user_data.columns = ['Impression ID', 'User ID', 'Time', 
+                                  'History', 'Impressions'] # set column names
+        self.user_data.drop(self.user_data[self.user_data['History'].isna()]
+                            .index, inplace=True)
         self.user_data.drop('Impression ID', axis=1, inplace=True)
         
         d={} # collect user impressions
@@ -91,8 +114,8 @@ class MINDSmallData():
             if row[1][0] not in d.keys():
                 d[row[1][0]] = []
             d[row[1][0]].append(row[1][3])
-        od = collections.OrderedDict(sorted(d.items())) # order dictionary by keys
-        self.user_data.drop_duplicates(subset='User ID', inplace=True) # removes duplicate user appearances
+        od = collections.OrderedDict(sorted(d.items()))
+        self.user_data.drop_duplicates(subset='User ID', inplace=True)
         self.user_data.sort_values(by='User ID', inplace=True)
         self.user_data.drop('Impressions', axis=1, inplace=True)
         self.user_data['Impressions'] = od.values()
@@ -105,10 +128,13 @@ class MINDSmallData():
                 if '-1' in article:
                     articles_read[i].append(article[:-2])
         
-        self.user_data['Read Articles'] = list(articles_read.values()) # create column Articles Read in dataframe
-        self.user_data['Read Articles'] = self.user_data['Read Articles'].apply(lambda x: " ".join(x))
-        self.user_data['Read Articles'] = self.user_data['History'] + ' ' + self.user_data['Read Articles']
-        self.user_data.drop(['History', 'Time', 'Impressions'], axis=1, inplace=True)
+        self.user_data['Read Articles'] = list(articles_read.values())
+        self.user_data['Read Articles'] = (self.user_data['Read Articles']
+                                           .apply(lambda x: " ".join(x)))
+        self.user_data['Read Articles'] = (self.user_data['History'] + ' ' + 
+                                           self.user_data['Read Articles'])
+        self.user_data.drop(['History', 'Time', 'Impressions'], axis=1, 
+                            inplace=True)
         
         
     def plot_topic_distrubtions(self, news_data=None):
@@ -170,31 +196,6 @@ class MINDSmallData():
         ax.set_ylabel('Number of articles (log scaled)')
         plt.yscale('log');
         plt.savefig('subtopic_most_pop.png')
-        
-        
-        
-        
-        
-        
-# Additional cleaing of news_data        
-#         one_time_subtopics = list(self.news_data['subtopic'].value_counts()[(self.news_data['subtopic'].value_counts() == 1).values].index) 
-#         self.news_data.drop(self.news_data[self.news_data['subtopic'].apply(lambda x: x in one_time_subtopics)].index, inplace=True)
-
-#         self.news_data['topic'].replace('foodanddrink','FOOD & DRINK', inplace=True)
-#         self.news_data['topic'].replace('autos','CARS', inplace=True)
-
-#         self.news_data['topic'].replace('MIDDLEEAST', 'NEWS', inplace=True)
-        
-#         self.news_data.drop(self.news_data[self.news_data['topic'] == 'KIDS'].index, inplace=True)
-#         self.news_data.drop(self.news_data[self.news_data['topic'] == 'VIDEO'].index, inplace=True)
-
-#         self.news_data['subtopic'] = self.news_data['subtopic'].apply(lambda x: x.upper())
-#         subtopic_dict = {'WEATHERTOPSTORIES': 'WEATHER', 'FOOTBALL_NFL': 'NFL', 'NEWSSCIENCEANDTECHNOLOGY': 'SCIENCE & TECHNOLOGY',
-#                         'NEWSPOLITICS': 'POLITICS', 'BASEBALL_MLB': 'MLB', 'NEWSUS': 'US NEWS', 'BASKETBALL_NBA': 'NBA', 'NEWSCRIME': 'CRIME',
-#                         'NEWSWORLD': 'WORLD NEWS', 'FOOTBALL_NCAA': 'NCAA FOOTBALL', 'LIFESTYLEROYALS': 'ROYALTY LIFESTYLE'}
-#         self.news_data['subtopic'].replace(subtopic_dict, inplace=True)
-
-
 
 
 class CreateFeatureMatrix():
@@ -356,9 +357,6 @@ class CreateFeatureMatrix():
         plt.subplots_adjust(top=0.90, bottom=0.05, wspace=0.90, hspace=0.3)
         plt.show();
         plt.savefig('nmf_15.png')
-        
-        
-        
 
 
 class ContentRecommender():
@@ -373,6 +371,10 @@ class ContentRecommender():
     feature_matrix : TFIDF, LDA, or NMF matrix (num_documents x num_features)
     similarity_metric : str, default='cosine'
         'jaccard', 'pearson'
+        
+    Methods
+    -------
+    recommend : 
         
     
     Example
@@ -403,7 +405,7 @@ class ContentRecommender():
     def _calculate_covariance(self, doc_ind=None, user_vector=None):
         
         return pd.DataFrame(self.similarity_dict[self.similarity_metric](self.feature_matrix, user_vector), index = self.news_data.index)
-                   
+
     
     def recommend(self, User_ID, by=None):
         
@@ -413,17 +415,35 @@ class ContentRecommender():
         
         user_vector = self.feature_matrix.loc[articles_ind].mean(axis=0).to_numpy().reshape(1,-1)
 
-        of_interest_ind = self._calculate_covariance(self.feature_matrix.to_numpy(), user_vector).sort_values(by=0)[-20:].index[::-1]
+        of_interest_ind = self._calculate_covariance(self.feature_matrix.to_numpy(), user_vector).sort_values(by=0)[-10:].index[::-1]
 
-        return of_interest_ind
+        print(f'We recommend the following articles: ')
+        t = PrettyTable([' ', 'Title']) # create table of topic, interst level, and number recommended
+        for i, title in enumerate(list(self.news_data['title'][of_interest_ind].values)):
+            t.add_row([i + 1, title])
+        t.align = 'l'
+        print(t)
+    
+    
+#     def recommend(self, User_ID, by=None):
         
-        R = self.news_data['subtopic'][articles_ind].values
-        
-        S = self.news_data['title'][articles_ind].values
-        
-        T = self.news_data['subtopic'][of_interest_ind].values
+#         articles = ''.join(list(self.user_data[self.user_data['User ID'] == User_ID]['Read Articles'].values))
 
-        U = self.news_data['title'][of_interest_ind].values
+#         articles_ind = self.news_data[self.news_data['code'].apply(lambda x: x in articles)].index
+        
+#         user_vector = self.feature_matrix.loc[articles_ind].mean(axis=0).to_numpy().reshape(1,-1)
+
+#         of_interest_ind = self._calculate_covariance(self.feature_matrix.to_numpy(), user_vector).sort_values(by=0)[-20:].index[::-1]
+
+#         return of_interest_ind
+        
+#         R = self.news_data['subtopic'][articles_ind].values
+        
+#         S = self.news_data['title'][articles_ind].values
+        
+#         T = self.news_data['subtopic'][of_interest_ind].values
+
+#         U = self.news_data['title'][of_interest_ind].values
 
 #         return pd.DataFrame({'code': self.news_data['code'][of_interest_ind].values, 'topic': self.news_data['topic'][of_interest_ind].values, 'title': self.news_data['title'][of_interest_ind].values}), self.news_data[by][of_interest_ind].value_counts().index, self.news_data[by][of_interest_ind].value_counts().values
     
@@ -488,121 +508,3 @@ class ContentRecommender():
             print('\n')
 
             print(w)
-
-            
-            
-            
-            
-            
-            
-            
-            
-            
-            
-
-
-
-
-
-
-
-
-    # other pieces for recommend: WOO!
-    
-    # print('Here are the articles you\'ve read:')
-        
-#         read_articles = []
-#         for r, s in zip(R, S):
-#             read_articles.append(r + ': ' + s)
-#         print(read_articles)
-        
-#         print(f'\n Here are some articles we recommend:')
-
-#         for t, u in zip(T, U):
-#             print('\t' + t + ': ' + u)
-            
-          
-            
-    def evaluate(self, x=range(10)):
-
-        user_topics = []
-        recommended_topics = []
-        for i in x:
-            articles = self.user_data['Read Articles'][i]
-            
-            articles_ind = self.news_data[self.news_data['code'].apply(lambda x: x in articles)].index
-
-            W_df = pd.read_csv('data/W.csv').drop('Unnamed: 0',axis=1).set_index(self.news_data.index)
-
-            user_vector = W_df.loc[articles_ind].mean(axis=0).to_numpy().reshape(1,-1)
-
-            of_interest_ind = self._calculate_user_covariance(W_df.to_numpy(), user_vector).sort_values(by=0)[-6:].index[::-1]
-
-            self.news_data['topic'][of_interest_ind].values
-            
-            user_topics.append(set(self.news_data['topic'][articles_ind].values))
-            
-            recommended_topics.append(self.news_data['topic'][of_interest_ind].values)
-
-        for u, r in zip(user_topics, recommended_topics):
-            print(', '.join(list(u)) + ': ' + ', '.join(r))
-            
-            
-    def evaluate_NMF(self, x=range(1)):
-
-        
-        user_data_2 = self.user_data[self.user_data['Read Articles'].apply(lambda x: len(x.split(' ')) > 450)]
-        
-        if self.NMF:
-            df = pd.read_csv('data/W.csv').drop('Unnamed: 0',axis=1).set_index(self.news_data.index)
-
-        elif self.LDA:
-            df = pd.read_csv('data/LDA_matrix.csv').drop('Unnamed: 0',axis=1).set_index(self.news_data.index)
-            
-        else:
-            pass
-        
-        for i in x: # user_data_2.shape[0]
-            
-#             user_codes = None
-#             test_codes = None
-#             recommended_codes = None
-            read_articles = []
-#             train_articles = None
-#             test_articles = None
-#             train_articles_ind = None
-#             test_articles_ind = None
-            
-            for code in user_data_2['Read Articles'].iloc[i].split(' '):
-                if code in self.news_data['code'].values:
-                    read_articles.append(code)
-                    
-            train_articles = read_articles[:-5]
-            test_articles = read_articles[-5:]
-
-            train_articles_ind = self.news_data[self.news_data['code'].apply(lambda x: x in train_articles)].index
-            test_articles_ind = self.news_data[self.news_data['code'].apply(lambda x: x in test_articles)].index
-
-            
-
-            user_vector = df.loc[train_articles_ind].mean(axis=0).to_numpy().reshape(1,-1)
-
-            covariance_df = self._calculate_user_covariance(df.to_numpy(), user_vector)
-            
-            print(covariance_df.iloc[test_articles_ind])
-            print(user_vector)
-            
-#             print(covariance_df.sort_values(by=0)[-10:])
-            
-#             of_interest_ind = self._calculate_user_covariance(df.to_numpy(), user_vector).sort_values(by=0)[-50:].index[::-1]
-
-#             user_codes = self.news_data['code'][train_articles_ind].values
-
-#             test_codes = self.news_data['code'][test_articles_ind].values
-
-#             recommended_codes = self.news_data['code'][of_interest_ind].values
-
-#             print(any(item in recommended_codes for item in test_codes))
-#             print(test_codes, recommended_codes)
-#             print(len(list(user_codes)))
-            
