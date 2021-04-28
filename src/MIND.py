@@ -208,6 +208,10 @@ class CreateFeatureMatrix():
     n_components : int, must be at least 2
     ngram_range : tuple of two integers, first int must be equal to or less than the second
     
+    Methods
+    -------
+    featurize : featurize corpus as TFIDF, LDA, or NMF vectors
+    
     See Also
     --------
     
@@ -303,8 +307,6 @@ class CreateFeatureMatrix():
         
         self.feature_matrix = self.model.transform(self.vectorized)
 
-
-    # research optimal number of components
     
     def _reconstruction_error(self): # get reconstruction error per n_components
         
