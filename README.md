@@ -31,4 +31,4 @@ The [MIND dataset](https://msnews.github.io/#about-mind) is designed for testing
 ### Gratitude
 Thank you to the staff at Galvanize Austin for stimulating this project! Thanks Juliana Duncan, Dan Rupp, Kiara Hearn, and Kristen Grewe.
 
-<img align="center" width="250" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/MIND_logo.png"><img align="center" width="250" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/tech_stack1.png">
+<img align="center" width="250" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/MIND_logo.png"><img align="right" width="400" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/tech_stack1.png">
