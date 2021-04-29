@@ -34,4 +34,4 @@ This project pushed me to embrace object-oriented-programming, creating classes 
 ### Gratitude
 Thank you to the staff at Galvanize Austin for stimulating this project! Thanks Juliana Duncan, Dan Rupp, Kiara Hearn, and Kristen Grewe.
 
-<img align="right" width="350" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/tech_stack1.png">
+<img align="center" width="350" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/tech_stack1.png">
