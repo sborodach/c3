@@ -19,6 +19,9 @@ Utilizing the [MIcrosoft News Dataset (MIND)](https://msnews.github.io/#about-mi
   Finally, recommednations are used by passing in a single User ID into the ContentRecommender class, which creates a user vector by averaging together the features values across all topics for all the artiles read by the user. Then the cosine similarity is calculated between the newly generated user vector and the remaining corpus articles. Laslty, article titles with links are outputted for the user.
 
 ### Findings
+Content recommenders are challenging to evaluate. See [this paper] 
+
+This project pushed me to embrace object-oriented-programming, creating classes that can be easily utilized by myself and others in order to reproduce the work done here.
 
 ### Future Work
 1. scraping medium.com
