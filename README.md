@@ -13,7 +13,7 @@ The [MIcrosoft News Dataset (MIND)](https://msnews.github.io/#about-mind) is des
   links from news.tsv, request html, mongoDB, add to dataframe
   
 3. Vectorization and Topic Modeling
-  The CreateFeatureMatrix class utilizes either a Count Vectorizer or a TFIDF vectorizer depending on the specification of the user. A Count Vectorizer is appropriate to use for LDA. See [this paper] (https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf) for further explanation on LDA. The recommender can be run using a TFIDF feature matrix, or, once vectorized, the data can be reduced with an NMF model.
+  The CreateFeatureMatrix class utilizes either a Count Vectorizer or a TFIDF vectorizer depending on the specification of the user. A Count Vectorizer is appropriate to use for LDA. See [this paper](https://www.jmlr.org/papers/volume3/blei03a/blei03a.pdf) for further explanation on LDA. The recommender can be run using a TFIDF feature matrix, or, once vectorized, the data can be reduced with an NMF model.
 
 4. Recommendation
   Finally, recommednations are used by passing in a single User ID into the ContentRecommender class, which creates a user vector by averaging together the features values across all topics for all the artiles read by the user. Then the cosine similarity is calculated between the newly generated user vector and the remaining corpus articles. Laslty, article titles with links are outputted for the user.
