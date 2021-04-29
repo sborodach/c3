@@ -1,5 +1,3 @@
-<img align="center" width="250" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/content_based_filtering.png">
-
 ### About
 The [MIND dataset](https://msnews.github.io/#about-mind) is designed for testing recommender systems. I sought to build a recommender for the MIcrosoft News Dataset (MIND) in order to explore the challenges of building an effective recommender. I learned to couple topic modeling techniques with similarity metrics to make content based recommendations for users based on their reading history. Since no metric exists to evaluate such recommendations, evaluating the recommender’s performance required qualitatively comparing individual instances of user recommendations with their reading history. I found the recommender performs well given topic modeling features matrices, specifically under LDA, indicating that dimensionality reduction captures underlying themes in the news articles.
 
@@ -33,5 +31,4 @@ The [MIND dataset](https://msnews.github.io/#about-mind) is designed for testing
 ### Gratitude
 Thank you to the staff at Galvanize Austin for stimulating this project! Thanks Juliana Duncan, Dan Rupp, Kiara Hearn, and Kristen Grewe.
 
-<img align="center" width="150" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/MIND_logo.png">
-<img align="right" width="150" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/MIND_logo.png">
+<img align="center" width="250" height="250" src="https://github.com/sborodach/news-content-recommender/blob/main/img/MIND_logo.png">
