@@ -11,14 +11,14 @@ class NewsDataFrameProcessor():
         self.news_dataframe = (pd.read_csv(news_tsv_filepath, sep='\t').T.reset_index().T.reset_index(drop=True))
 
     def clean_news_dataframe(self):
-        newsDataFrameCleaner = NewsDataFrameCleaner(self.news_dataframe)
-        self.news_dataframe = newsDataFrameCleaner.news_dataframe
+        newsDataFrameWrangler = NewsDataFrameWrangler(self.news_dataframe)
+        self.news_dataframe = newsDataFrameWrangler.news_dataframe
 
     def add_news_content_column(self):
         newsContentColumnAdder = NewsContentColumnAdder(self.news_dataframe['URL'])
         self.news_dataframe['Content'] = newsContentColumnAdder.news_content
 
-class NewsDataFrameCleaner():
+class NewsDataFrameWrangler():
 
     def __init__(self, news_dataframe):
         self.news_dataframe = news_dataframe
@@ -76,7 +76,8 @@ class NewsContentColumnAdder():
         self.news_content = self._save_html_to_mongo_database()
 
 if __name__ == "__main__":
-    news_tsv_filepath = '../MINDsmall_train/news_test.tsv'
+    news_tsv_filepath = '../data/news_test.tsv'
     newsDataFrameProcessor = NewsDataFrameProcessor(news_tsv_filepath)
     newsDataFrameProcessor.clean_news_dataframe()
     newsDataFrameProcessor.add_news_content_column()
+    print(newsDataFrameProcessor.news_dataframe.head())
